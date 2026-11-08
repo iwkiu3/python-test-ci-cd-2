@@ -1,6 +1,5 @@
 name: CI/CD Pipeline
 
-# 2) Запуск при пуше и PR в main
 on:
   push:
     branches: [ main ]
@@ -8,17 +7,17 @@ on:
     branches: [ main ]
 
 jobs:
-  # 3) Job для тестов с матрицей Python
   test:
+    name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false # Важно: чтобы ошибка в 3.11 не отменяла запуск 3.12
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -27,18 +26,19 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Устанавливаем проект и зависимости для тестов
-          pip install -e ".[test]" 
-          # Если нет группы [test], просто: pip install -e . && pip install pytest
+          pip install -e .
+          # Добавляем asgiref для асинхронных тестов и фиксируем werkzeug, чтобы избежать бага с 404 вместо 400
+          pip install pytest asgiref "werkzeug<3.1.0"
 
       - name: Run tests
         run: |
           pytest tests/ -v
 
-  # 4) Job build-and-run (запускается только после успеха всех тестов)
   build-and-run:
-    needs: test 
+    name: Build and Run
+    needs: test
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -52,7 +52,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
 
-      - name: Build package (.whl and .tar.gz)
+      - name: Build package
         run: |
           python -m build
 
@@ -65,20 +65,19 @@ jobs:
       - name: Install Flaskr example
         run: |
           source venv/bin/activate
-          # Предполагаем, что flaskr находится в examples/tutorial
           pip install -e examples/tutorial/
 
-      - name: Init DB
+      - name: Initialize database
         run: |
           source venv/bin/activate
           export FLASK_APP=flaskr
           flask init-db
 
-      - name: Run App on port 5000
+      - name: Run app on port 5000
         run: |
           source venv/bin/activate
           export FLASK_APP=flaskr
-          # Запускаем и проверяем доступность
           flask run --host=0.0.0.0 --port=5000 &
           sleep 5
-          curl http://localhost:5000 || exit 1
+          curl -f http://localhost:5000 || exit 1
+          kill %1
