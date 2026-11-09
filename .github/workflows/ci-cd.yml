@@ -31,7 +31,9 @@ jobs:
           pip install -e ".[test]" || pip install -e .
           # Werkzeug НЕ закрепляем: Flask использует set_cookie(partitioned=...),
           # который есть только в Werkzeug >= 3.1
-          pip install pytest asgiref
+          # pytest закреплён: тесты Flask импортируют _pytest.monkeypatch.notset,
+          # которого нет в новых версиях pytest
+          pip install pytest==8.3.3 asgiref
 
       - name: Run tests
         run: pytest tests/ -v
