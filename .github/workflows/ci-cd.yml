@@ -9,17 +9,17 @@ on:
 jobs:
   test:
     name: Test Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false # версии Python запускаются независимо друг от друга
       matrix:
         python-version: ["3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip # кэш pip ускоряет установку зависимостей
@@ -29,27 +29,23 @@ jobs:
           python -m pip install --upgrade pip
           # Ставим проект и зависимости для тестов
           pip install -e ".[test]" || pip install -e .
-          # Фиксируем совместимые версии, чтобы тесты Flask не падали
-          pip install pytest==8.3.3 asgiref "werkzeug<3.1"
+          # Werkzeug НЕ закрепляем: Flask использует set_cookie(partitioned=...),
+          # который есть только в Werkzeug >= 3.1
+          pip install pytest asgiref
 
       - name: Run tests
-        run: |
-          # Известные проблемные файлы пропускаем явно,
-          # но если упадёт любой другой тест, шаг (и пайплайн) станет красным
-          pytest tests/ -v \
-            --ignore-glob="*test_helpers*" \
-            --ignore-glob="*test_reqctx*"
+        run: pytest tests/ -v
 
   build-and-run:
     name: Build and Run
     needs: test # запускается только после успешных тестов
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
